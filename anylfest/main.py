@@ -126,7 +126,7 @@ def main():
           stash["uid_app"].append(lobj[apk].manifest.attrib["package"])
       except Exception, e:
 	print "PROBLEM: %s" % e
-        current["sharesUID"] = False #"No System UID sharing" # TODO: problem - this is always getting hit..
+        current["sharesUID"] = False #"No System UID sharing" 
 
       # map is hackish method of casting all items as strings for serialization purposes
       current["codes"] = map(str, lobj[apk].getSecretCodes())
@@ -136,10 +136,9 @@ def main():
       current["services"] = map(str, lobj[apk].getExportedService())
       current["receivers"] = map(str, lobj[apk].getExportedReceiver())
       current["providers"] = map(str, lobj[apk].getExportedProvider())
-      current["menus"] = map(str, lobj[apk].getHiddenMenuActivities()) # seemed to fix the wifi serialization problem
+      current["menus"] = map(str, lobj[apk].getHiddenMenuActivities())
 
       # do_the_thing just iterates through the 3rd arg and prints it 
-
       pretty_print("Package: %s\n" % current["package"])
       pretty_print("Debuggable: %s\n" % current["debuggable"])
       pretty_print("Shares System UID: %s\n" % current["sharesUID"])
