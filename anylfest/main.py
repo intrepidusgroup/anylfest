@@ -70,11 +70,15 @@ def main():
 
   files = getFiles(args.path)
 
-  provider_violator_stash = list()
-  secret_code_stash = list()
-  hidden_menu_stash = list()
-  debuggable_app_stash = list()
-  uid_app_stash = list()
+  apkdb = []
+  stash = {
+	"provider_violator": [],
+	"secret_code": [],
+	"hidden_menu": [],
+	"debuggable_app": [],
+	"uid_app": []
+
+}
 
   # Send the files off to loader to get parsed
   for curr_file in files:
@@ -85,73 +89,92 @@ def main():
       print "error parsing file %s" % str(i)
 
   for apk in lobj.keys():
-    idx = 1
-    package = lobj[apk].manifest.attrib["package"]
-    picky_package = 'com.google' not in package and 'com.android' not in package
+    # initialize apk data structure - TODO: need to indicate current name
+    current = {}
+
+    idx = 1 # redundant
+    current["package"] = lobj[apk].manifest.attrib["package"]
+    picky_package = 'com.google' not in current["package"] and 'com.android' not in current["package"]
     if args.verbose:
       print "Picky package returned",picky_package
 
     if (not args.picky) or (args.picky and picky_package):
 
-      pretty_print("Package: %s\n" % lobj[apk].manifest.attrib["package"])
-
+      ##############
+      # DEBUGGABLE
+      ##############
       try:
-        isDebug = lobj[apk].isDebuggable()
-        pretty_print("Debuggable: %s" % isDebug )
-        if isDebug:
-          debuggable_app_stash.append(lobj[apk].manifest.attrib["package"])
-      except:
-        pretty_print("No debuggable attribute")
+        current["debuggable"] = lobj[apk].isDebuggable()
+        #current["debuggable"] = "%s" % isDebug  # new
 
+        if current["debuggable"]:
+          stash["debuggable_app"].append(lobj[apk].manifest.attrib["package"])
+
+      except Exception, e:
+	print "PROBLEM: %s" % e
+        current["debuggable"] = False # this is always getting hit..
+
+
+      ##############
+      # UID SHARE - TODO: problem (not serializing correctly - saved as "true")
+      ##############
       try:
-        sharesUID = lobj[apk].isUIDShare()
-        pretty_print("Shares System UID: %s" % sharesUID )
-        if sharesUID:
-          uid_app_stash.append(lobj[apk].manifest.attrib["package"])
-      except:
-        pretty_print("No System UID sharing")
-      
-      codes = lobj[apk].getSecretCodes()
-      do_the_thing(idx,"List of secret codes:",codes)
-      for code in codes:
-        secret_code_stash.append(code)
-      idx += 1
+	current["sharesUID"] = lobj[apk].isUIDShare()
+        #current["sharesUID"] = "%s" % sharesUID #"Shares System UID: %s" % sharesUID
 
-      activities = lobj[apk].getExportedActivity()
-      do_the_thing(idx,"List of exported activities:",activities)
-      idx += 1
+        if current["sharesUID"]:
+          stash["uid_app"].append(lobj[apk].manifest.attrib["package"])
+      except Exception, e:
+	print "PROBLEM: %s" % e
+        current["sharesUID"] = False #"No System UID sharing" # TODO: problem - this is always getting hit..
 
-      services = lobj[apk].getExportedService()
-      do_the_thing(idx,"List of exported services:",services)
-      idx += 1
+      # map is hackish method of casting all items as strings for serialization purposes
+      current["codes"] = map(str, lobj[apk].getSecretCodes())
+      current["activities"] = map(str, lobj[apk].getExportedActivity()) # of type list..
 
-      receivers = lobj[apk].getExportedReceiver()
-      do_the_thing(idx,"List of exported broadcast receivers:",receivers)
-      idx += 1
-      
-      providers = lobj[apk].getExportedProvider()
-      do_the_thing(idx,"List of exported content providers:",providers)
-      idx += 1
-      for provider in providers:
-        provider_violator_stash.append(provider)
 
-      menus = lobj[apk].getHiddenMenuActivities()
-      do_the_thing(idx,"Potential hidden menu activities:",menus)
-      idx += 1
-      for menu in menus:
-        hidden_menu_stash.append(menu)
+      current["services"] = map(str, lobj[apk].getExportedService())
+      current["receivers"] = map(str, lobj[apk].getExportedReceiver())
+      current["providers"] = map(str, lobj[apk].getExportedProvider())
+      current["menus"] = map(str, lobj[apk].getHiddenMenuActivities()) # seemed to fix the wifi serialization problem
+
+      # do_the_thing just iterates through the 3rd arg and prints it 
+
+      pretty_print("Package: %s\n" % current["package"])
+      pretty_print("Debuggable: %s\n" % current["debuggable"])
+      pretty_print("Shares System UID: %s\n" % current["sharesUID"])
+      do_the_thing(1,"List of secret codes:", current["codes"])
+      do_the_thing(2,"List of exported activities:",current["activities"])
+      do_the_thing(3,"List of exported services:",current["services"])
+      do_the_thing(4,"List of exported broadcast receivers:",current["receivers"])
+      do_the_thing(5,"List of exported content providers:",current["providers"])
+      do_the_thing(6,"Potential hidden menu activities:",current["menus"])
+
+      stash["secret_code"] += current["codes"]
+      stash["provider_violator"] += current["providers"]
+      stash["hidden_menu"] += current["menus"]
+
+      # add to the overall database
+      apkdb.append(current)
 
     pretty_print("---------------===== END OF MANIFEST =====---------------")
 
-  end_print("Unprotected provider stash:",provider_violator_stash)
+  ###############
+  ## Synopsis
+  ###############
+  end_print("Unprotected provider stash:",stash["provider_violator"])
+  end_print("Hidden code stash:", stash["secret_code"])
+  end_print("Hidden menu stash:", stash["hidden_menu"])
+  end_print("Debuggable app stash:", stash["debuggable_app"])
+  end_print("UID Sharing stash:", stash["uid_app"])
 
-  end_print("Hidden code stash:",secret_code_stash)
-
-  end_print("Hidden menu stash:",hidden_menu_stash)
-
-  end_print("Debuggable app stash:",debuggable_app_stash)
-
-  end_print("UID Sharing stash:",uid_app_stash)
+  #######################
+  ## Export to database (depending on flag?)
+  #######################
+  import json
+  db = "anylfest.db" # set depending on flag, 
+  with open(db, 'w') as outfile:
+    json.dump(apkdb,outfile)
 
 if __name__ == '__main__':
     main()
