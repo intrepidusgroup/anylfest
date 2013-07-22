@@ -125,7 +125,7 @@ class Loader(object):
           fmtstr += curr_obj.name
           multiple = True
         curr_obj.fmtstr += fmtstr
-        self.exported_activity_list.append(curr_obj)
+        self.exported_activity_list.append(curr_obj) # FLAG
 
   def _processServices(self):
     for curr_obj in self.service:
@@ -144,14 +144,14 @@ class Loader(object):
           fmtstr += curr_obj.name
           multiple = True
         curr_obj.fmtstr += fmtstr
-        self.exported_service_list.append(curr_obj)
+        self.exported_service_list.append(str(curr_obj)) # FLAG - shouldn't this be a string...
 
   def _processProviders(self):
     for curr_obj in self.provider:
       if curr_obj.exported and not curr_obj._isProtected():
         fmtstr = self.manifest.attrib["package"] + " : " + curr_obj.name
         curr_obj.fmtstr = fmtstr
-        self.exported_provider_list.append(curr_obj)
+        self.exported_provider_list.append(curr_obj) # FLAG
 
   def _processReceivers(self):
     for curr_obj in self.receiver:
